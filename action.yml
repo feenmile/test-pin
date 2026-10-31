@@ -1,0 +1,61 @@
+name: test-pin
+description: Run your tests with the base branch's test files, so a pull request cannot pass by editing its tests.
+author: Feenmile
+branding:
+  icon: lock
+  color: gray-dark
+
+inputs:
+  tests:
+    description: Comma-separated globs for test files (include fixtures, conftest and test config), e.g. "tests/**,**/conftest.py".
+    required: true
+  run:
+    description: Test command, run through bash from the root of a temporary worktree.
+    required: true
+  base:
+    description: Base ref or sha. Defaults to the pull request's base sha.
+    required: false
+    default: ""
+  approve-file:
+    description: Approval file, relative to the repository root.
+    required: false
+    default: .testpin-approved
+  setup-python:
+    description: Set to "false" to skip actions/setup-python (test-pin needs Python 3.10+ on PATH).
+    required: false
+    default: "true"
+  python-version:
+    description: Python version for actions/setup-python.
+    required: false
+    default: "3.12"
+
+runs:
+  using: composite
+  steps:
+    - if: inputs.setup-python == 'true'
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: test-pin check
+      shell: bash
+      env:
+        TESTPIN_BASE: ${{ inputs.base || github.event.pull_request.base.sha }}
+        TESTPIN_TESTS: ${{ inputs.tests }}
+        TESTPIN_RUN: ${{ inputs.run }}
+        TESTPIN_APPROVE_FILE: ${{ inputs.approve-file }}
+      run: |
+        set -u
+        if [ -z "$TESTPIN_BASE" ]; then
+          echo "::error::test-pin: no base ref. Run on pull_request or set the 'base' input."
+          exit 4
+        fi
+        if ! git cat-file -e "${TESTPIN_BASE}^{commit}" 2>/dev/null; then
+          git fetch --no-tags --quiet origin "$TESTPIN_BASE" || true
+        fi
+        # Inputs travel through env vars, never interpolated into the script.
+        python "$GITHUB_ACTION_PATH/testpin" check \
+          --base "$TESTPIN_BASE" \
+          --tests "$TESTPIN_TESTS" \
+          --run "$TESTPIN_RUN" \
+          --approve-file "$TESTPIN_APPROVE_FILE"

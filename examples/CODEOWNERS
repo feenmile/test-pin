@@ -1,0 +1,4 @@
+# Copy into .github/CODEOWNERS and turn on "Require review from Code Owners"
+# in branch protection. Replace @your-org/maintainers with real reviewers.
+/.testpin-approved   @your-org/maintainers
+/.github/            @your-org/maintainers
