@@ -20,6 +20,10 @@ classifiers = [
 ]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/feenmile/test-pin"
+Source = "https://github.com/feenmile/test-pin"
+
 [project.scripts]
 testpin = "testpin.cli:main"
 testpin-hook = "testpin.hook:main"
