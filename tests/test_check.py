@@ -7,6 +7,7 @@ first shown to fool a plain test run, so a pass here is not a pass by coincidenc
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import os
 import sys
@@ -54,6 +55,57 @@ class SourceOnlyChanges(RepoTestCase):
         self.repo.commit("break")
         self.repo.check()
         self.assertEqual(self.repo.worktree_count(), 1)
+
+
+class CheckoutUntouched(RepoTestCase):
+    """`check` must not modify the caller's checkout: files, index, status, HEAD or refs."""
+
+    def snapshot(self) -> dict:
+        files = {}
+        for dirpath, dirnames, filenames in os.walk(self.repo.path):
+            dirnames[:] = [d for d in dirnames if d != ".git"]
+            for name in filenames:
+                full = os.path.join(dirpath, name)
+                with open(full, "rb") as fh:
+                    files[os.path.relpath(full, self.repo.path).replace(os.sep, "/")] = (
+                        hashlib.sha256(fh.read()).hexdigest())
+        return {
+            "files": files,
+            "status": self.repo.git("status", "--porcelain=v1", "--untracked-files=all", "--ignored"),
+            "index": self.repo.git("ls-files", "--stage"),
+            "head": self.repo.git("rev-parse", "HEAD"),
+            "branch": self.repo.git("symbolic-ref", "HEAD"),
+            "refs": self.repo.git("for-each-ref"),
+            "worktrees": self.repo.git("worktree", "list", "--porcelain"),
+        }
+
+    def make_checkout_dirty(self) -> None:
+        # Uncommitted work of every kind, so a stray restore, checkout, add or stash would show.
+        self.repo.write("tests/test_calc.py", REAL_TEST + "\n# unstaged edit\n")
+        self.repo.write("staged.txt", "staged only\n")
+        self.repo.git("add", "staged.txt")
+        self.repo.write("tests/test_untracked.py", TRIVIAL_TEST)
+        self.repo.write("notes.txt", "untracked\n")
+
+    def assert_check_leaves_checkout_alone(self, expected_code: int) -> None:
+        self.make_checkout_dirty()
+        before = self.snapshot()
+        self.assertTrue(before["status"].strip())  # the checkout really is dirty
+        code, out = self.repo.check()
+        self.assertEqual(code, expected_code, out)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_passing_check_leaves_checkout_unchanged(self):
+        self.repo.write("calc.py", REFACTORED_CALC)
+        self.repo.commit("refactor")
+        self.assert_check_leaves_checkout_alone(0)
+
+    def test_failing_check_with_test_changes_leaves_checkout_unchanged(self):
+        self.repo.write("calc.py", BROKEN_CALC)
+        self.repo.write("tests/test_calc.py", ALWAYS_PASS_TEST)
+        self.repo.write("tests/test_extra.py", EXTRA_TEST)
+        self.repo.commit("break and cheat")
+        self.assert_check_leaves_checkout_alone(FAIL | NEEDS)
 
 
 class WeakenedTests(RepoTestCase):

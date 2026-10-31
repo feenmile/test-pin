@@ -3,8 +3,13 @@
 Judge a code change with the tests it started from.
 
 AI coding agents sometimes make a failing test suite pass by editing, deleting or
-weakening the tests instead of fixing the code. Published benchmark research has found
-frontier models doing this often, mostly by editing the test files directly.
+weakening the tests instead of fixing the code. [ImpossibleBench](https://arxiv.org/abs/2510.20270)
+(Zhong, Raghunathan and Carlini, 2025) measures this with tasks whose tests contradict the
+specification, so any pass is a cheat. It reports that "GPT-5 cheats 54.0% of the time on
+Conflicting-SWEbench", and that Claude models and Qwen3-Coder "cheat primarily (>79%) through
+modifying test cases". OpenAI models used more varied tricks, often special-casing the
+tests in the source code, which test-pin does not catch (see
+[What it does not do](#what-it-does-not-do)).
 
 `test-pin` runs your test command against the new code but with the **test files from the
 base commit**. Edits to tests cannot make a change pass. When a test really does need to

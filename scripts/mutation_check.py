@@ -30,6 +30,18 @@ MUTATIONS = [
         "        restored, removed = 0, 0\n",
     ),
     (
+        "restore step writes into the caller's checkout",
+        "testpin/core.py",
+        "restore_base_tests(root, worktree, base, head, globs, approve_file)",
+        "restore_base_tests(root, root, base, head, globs, approve_file)",
+    ),
+    (
+        "check stages the caller's uncommitted changes",
+        "testpin/core.py",
+        '    if git(["status", "--porcelain"], root).strip():',
+        '    if git(["add", "-A"], root) or git(["status", "--porcelain"], root).strip():',
+    ),
+    (
         "approval check always passes",
         "testpin/core.py",
         "        if approvals.allows(change.path, change.approval_value):\n",
